@@ -1,0 +1,138 @@
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root, [data-theme="default"] {
+  --bg: #0a0a0a;
+  --header-bg: #111111;
+  --header-border: #222;
+  --text: #d4d4d4;
+  --accent: #5eead4;
+  --error: #f87171;
+  --info: #60a5fa;
+  --selection: #374151;
+}
+
+[data-theme="dracula"] {
+  --bg: #282a36;
+  --header-bg: #21222c;
+  --header-border: #44475a;
+  --text: #f8f8f2;
+  --accent: #50fa7b;
+  --error: #ff5555;
+  --info: #8be9fd;
+  --selection: #44475a;
+}
+
+[data-theme="solarized"] {
+  --bg: #002b36;
+  --header-bg: #073642;
+  --header-border: #586e75;
+  --text: #839496;
+  --accent: #2aa198;
+  --error: #dc322f;
+  --info: #268bd2;
+  --selection: #073642;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+}
+
+#header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  font-family: "Consolas", monospace;
+  font-size: 15px;
+  color: var(--info);
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--header-border);
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+#theme-select {
+  font-family: "Consolas", monospace;
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--header-border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  outline: none;
+}
+
+#theme-select:hover {
+  border-color: var(--accent);
+}
+
+#terminal {
+  font-family: "Consolas", monospace;
+  font-size: 15px;
+  color: var(--text);
+  background: var(--bg);
+  min-height: 100vh;
+  padding: 12px;
+  padding-top: 50px;
+  display: flex;
+  flex-direction: column;
+}
+
+#output {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  line-height: 1.5;
+}
+
+#output .prompt-echo {
+  color: var(--accent);
+}
+
+#output .error {
+  color: var(--error);
+}
+
+#output .info {
+  color: var(--info);
+}
+
+#output .dir {
+  color: var(--accent);
+  font-weight: bold;
+}
+
+#input-line {
+  display: flex;
+  align-items: center;
+  line-height: 1.5;
+}
+
+#prompt {
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+#input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: inherit;
+  caret-color: var(--accent);
+  line-height: inherit;
+}
+
+::selection {
+  background: var(--selection);
+}

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terminal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="header">
+    <span>Welcome to the Web Terminal! Type 'help' to see available commands.</span>
+    <select id="theme-select">
+      <option value="default">Default</option>
+      <option value="dracula">Dracula</option>
+      <option value="solarized">Solarized</option>
+    </select>
+  </div>
+  <div id="terminal">
+    <div id="output"></div>
+    <div id="input-line">
+      <span id="prompt">guest@web:~$&nbsp;</span>
+      <input id="input" type="text" autofocus autocomplete="off" spellcheck="false">
+    </div>
+  </div>
+  <script src="terminal.js"></script>
+  <script src="commands/help.js"></script>
+  <script src="commands/ls.js"></script>
+  <script src="commands/cd.js"></script>
+  <script src="commands/pwd.js"></script>
+  <script src="commands/cat.js"></script>
+  <script src="commands/echo.js"></script>
+  <script src="commands/mkdir.js"></script>
+  <script src="commands/touch.js"></script>
+  <script src="commands/rm.js"></script>
+  <script src="commands/clear.js"></script>
+  <script src="commands/whoami.js"></script>
+  <script src="commands/date.js"></script>
+  <script src="commands/history.js"></script>
+  <script src="commands/neofetch.js"></script>
+  <script src="commands/reset.js"></script>
+</body>
+</html>

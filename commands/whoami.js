@@ -1,0 +1,3 @@
+commands.whoami = () => {
+  print("guest");
+};

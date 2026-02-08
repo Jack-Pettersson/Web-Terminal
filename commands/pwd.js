@@ -1,0 +1,3 @@
+commands.pwd = () => {
+  print(cwd);
+};

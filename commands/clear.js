@@ -1,0 +1,3 @@
+commands.clear = () => {
+  outputEl.textContent = "";
+};
