@@ -107,6 +107,12 @@ commands.neofetch = () => {
     { label: "Uptime", value: uptimeStr },
   ];
 
+  if (capturing) {
+    print("guest@web");
+    for (const entry of info) print(entry.label + ": " + entry.value);
+    return;
+  }
+
   const container = document.createElement("div");
   container.className = "neofetch";
   container.appendChild(neofetchArt(neofetchLogos[browser]));

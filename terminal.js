@@ -15,20 +15,20 @@ function defaultFs() {
               children: {
                 "about.txt": {
                   type: "file",
-                  content: "Welcome to the web terminal!\nThis is a fun little browser-based terminal.\nType 'help' to see what you can do.",
+                  content: "Welcome to the web terminal!\nThis is a fun little browser-based terminal.\nType 'help' to see what you can do.\nP.S. A plain 'ls' doesn't show everything.",
                 },
                 projects: {
                   type: "dir",
                   children: {
                     "readme.md": {
                       type: "file",
-                      content: "# Projects\nNothing here yet — go build something!",
+                      content: "# Projects\nNothing here yet - go build something!",
                     },
                   },
                 },
-                "notes.txt": {
+                ".clue1": {
                   type: "file",
-                  content: "Don't forget to have fun.",
+                  content: "You found the first clue!\nThe first word is: cosmic\nThe next clue is hiding where the config files live.",
                 },
               },
             },
@@ -41,21 +41,56 @@ function defaultFs() {
               type: "file",
               content: "web-terminal",
             },
+            ".clue2": {
+              type: "file",
+              content: "Nice work.\nThe second word is: goose\nThe last clue is somewhere temporary.",
+            },
           },
         },
         tmp: {
           type: "dir",
-          children: {},
+          children: {
+            ".clue3": {
+              type: "file",
+              content: "Almost there.\nThe third word is: honks\nNow run: unlock <first> <second> <third>",
+            },
+          },
         },
       },
     },
   };
 }
 
+const FS_VERSION = "2";
+
+function addMissing(saved, defaults) {
+  for (const [name, node] of Object.entries(defaults.children)) {
+    const existing = saved.children[name];
+    if (!existing) saved.children[name] = node;
+    else if (existing.type === "dir" && node.type === "dir") addMissing(existing, node);
+  }
+}
+
+function upgradeFs(saved) {
+  addMissing(saved["/"], defaultFs()["/"]);
+  const guest = saved["/"].children.home?.children?.guest;
+  if (guest?.children?.["notes.txt"]?.content === "Don't forget to have fun.") {
+    delete guest.children["notes.txt"];
+  }
+}
+
 function loadFs() {
   try {
     const saved = localStorage.getItem("webterm_fs");
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (localStorage.getItem("webterm_fs_version") !== FS_VERSION) {
+        upgradeFs(parsed);
+        localStorage.setItem("webterm_fs", JSON.stringify(parsed));
+        localStorage.setItem("webterm_fs_version", FS_VERSION);
+      }
+      return parsed;
+    }
   } catch (e) { /* ignore */ }
   return defaultFs();
 }
@@ -63,6 +98,7 @@ function loadFs() {
 function saveFs() {
   try {
     localStorage.setItem("webterm_fs", JSON.stringify(fs));
+    localStorage.setItem("webterm_fs_version", FS_VERSION);
   } catch (e) { /* ignore */ }
 }
 
@@ -160,6 +196,80 @@ function scrollToBottom() {
   window.scrollTo(0, document.body.scrollHeight);
 }
 
+let capturing = false;
+
+function captureOutput(fn) {
+  const captured = [];
+  const origPrint = print;
+  print = (text, className) => {
+    if (className === "error") {
+      origPrint(text, className); // errors still go to screen
+    } else {
+      captured.push(text);
+    }
+  };
+  capturing = true;
+  try {
+    fn();
+  } finally {
+    print = origPrint;
+    capturing = false;
+  }
+  return captured.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+//  Full-screen programs
+// ---------------------------------------------------------------------------
+
+let program = null;
+
+function startProgram(name, { onKey, onExit } = {}) {
+  if (capturing) {
+    print(`${name}: can't run inside a pipe or redirect`, "error");
+    return null;
+  }
+
+  const el = document.createElement("div");
+  el.id = "program";
+  document.body.appendChild(el);
+  inputEl.blur();
+
+  const current = {
+    el,
+    onKey,
+    exit() {
+      if (program !== current) return;
+      program = null;
+      el.remove();
+      if (onExit) onExit();
+      inputEl.focus();
+      scrollToBottom();
+    },
+  };
+  program = current;
+
+  // Touch screens have no keyboard here, so anything that waits for keys needs a way out
+  if (onKey && navigator.maxTouchPoints > 0) {
+    const button = document.createElement("button");
+    button.id = "program-exit";
+    button.textContent = "exit";
+    button.addEventListener("click", current.exit);
+    el.appendChild(button);
+  }
+
+  return current;
+}
+
+document.addEventListener("keydown", (e) => {
+  if (!program) return;
+  if (["Shift", "Control", "Alt", "Meta"].includes(e.key) || /^F\d+$/.test(e.key)) return;
+  if ((e.ctrlKey || e.metaKey) && e.key !== "c") return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (program.onKey) program.onKey(e);
+}, true);
+
 // ---------------------------------------------------------------------------
 //  Commands
 // ---------------------------------------------------------------------------
@@ -185,11 +295,49 @@ function executeCommand(line) {
   historyIndex = history.length;
   saveHistory();
 
-  // Parse: respect simple quoting
+  const segments = parsePipeline(tokenize(trimmed));
+  if (!segments) {
+    print("syntax error: incomplete pipe or redirect", "error");
+    return;
+  }
+
+  let stdin;
+  for (let i = 0; i < segments.length; i++) {
+    const { tokens, redirectFile, redirectAppend } = segments[i];
+    const [cmd, ...args] = tokens;
+
+    if (!Object.hasOwn(commands, cmd)) {
+      print(`${cmd}: command not found`, "error");
+      return;
+    }
+
+    if (i === segments.length - 1 && !redirectFile) {
+      commands[cmd](args, stdin);
+      return;
+    }
+
+    const input = stdin;
+    stdin = captureOutput(() => commands[cmd](args, input));
+
+    if (redirectFile) {
+      writeRedirect(redirectFile, redirectAppend, stdin);
+      stdin = "";
+    }
+  }
+}
+
+/** Split a line into words and { op } tokens, respecting simple quoting */
+function tokenize(line) {
   const tokens = [];
   let current = "";
   let inQuote = null;
-  for (const ch of trimmed) {
+  const flush = () => {
+    if (current) tokens.push(current);
+    current = "";
+  };
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
     if (inQuote) {
       if (ch === inQuote) {
         inQuote = null;
@@ -199,71 +347,67 @@ function executeCommand(line) {
     } else if (ch === '"' || ch === "'") {
       inQuote = ch;
     } else if (ch === " ") {
-      if (current) tokens.push(current);
-      current = "";
+      flush();
+    } else if (ch === "|") {
+      flush();
+      tokens.push({ op: "|" });
+    } else if (ch === ">") {
+      flush();
+      if (line[i + 1] === ">") {
+        tokens.push({ op: ">>" });
+        i++;
+      } else {
+        tokens.push({ op: ">" });
+      }
     } else {
       current += ch;
     }
   }
-  if (current) tokens.push(current);
+  flush();
+  return tokens;
+}
 
-  // Handle output redirection ( > and >> )
-  let redirectFile = null;
-  let redirectAppend = false;
-  const filteredTokens = [];
+/** Group tokens into pipeline segments, or return null if the syntax is broken */
+function parsePipeline(tokens) {
+  const segments = [{ tokens: [], redirectFile: null, redirectAppend: false }];
+
   for (let i = 0; i < tokens.length; i++) {
-    if (tokens[i] === ">>" || tokens[i] === ">") {
-      redirectAppend = tokens[i] === ">>";
-      redirectFile = tokens[i + 1] || null;
-      break;
+    const token = tokens[i];
+    const segment = segments[segments.length - 1];
+    if (token.op === "|") {
+      segments.push({ tokens: [], redirectFile: null, redirectAppend: false });
+    } else if (token.op) {
+      const target = tokens[i + 1];
+      if (typeof target !== "string") return null;
+      segment.redirectFile = target;
+      segment.redirectAppend = token.op === ">>";
+      i++;
+    } else {
+      segment.tokens.push(token);
     }
-    filteredTokens.push(tokens[i]);
   }
 
-  const [cmd, ...args] = filteredTokens;
+  return segments.every((s) => s.tokens.length > 0) ? segments : null;
+}
 
-  if (!commands[cmd]) {
-    print(`${cmd}: command not found`, "error");
+function writeRedirect(redirectFile, redirectAppend, content) {
+  const parts = resolvePath(redirectFile);
+  const name = parts.pop();
+  const parentNode = getNode(parts);
+
+  if (!parentNode || parentNode.type !== "dir") {
+    print(`redirect: ${redirectFile}: No such file or directory`, "error");
     return;
   }
 
-  if (redirectFile) {
-    // Capture output instead of printing to DOM
-    const captured = [];
-    const origPrint = print;
-    print = (text, className) => {
-      if (className === "error") {
-        origPrint(text, className); // errors still go to screen
-      } else {
-        captured.push(text);
-      }
-    };
-
-    commands[cmd](args);
-    print = origPrint;
-
-    // Write captured output to the target file
-    const parts = resolvePath(redirectFile);
-    const name = parts.pop();
-    const parentNode = getNode(parts);
-
-    if (!parentNode || parentNode.type !== "dir") {
-      print(`redirect: ${redirectFile}: No such file or directory`, "error");
-      return;
-    }
-
-    const content = captured.join("\n");
-    if (parentNode.children[name] && parentNode.children[name].type === "dir") {
-      print(`redirect: ${redirectFile}: Is a directory`, "error");
-    } else if (redirectAppend && parentNode.children[name]) {
-      parentNode.children[name].content += (parentNode.children[name].content ? "\n" : "") + content;
-      saveFs();
-    } else {
-      parentNode.children[name] = { type: "file", content };
-      saveFs();
-    }
+  if (parentNode.children[name] && parentNode.children[name].type === "dir") {
+    print(`redirect: ${redirectFile}: Is a directory`, "error");
+  } else if (redirectAppend && parentNode.children[name]) {
+    parentNode.children[name].content += (parentNode.children[name].content ? "\n" : "") + content;
+    saveFs();
   } else {
-    commands[cmd](args);
+    parentNode.children[name] = { type: "file", content };
+    saveFs();
   }
 }
 
@@ -278,20 +422,21 @@ function tabComplete() {
 
   // Split into tokens, but keep track of the raw partial at the end
   const spaceIndex = beforeCursor.lastIndexOf(" ");
-  const isFirstToken = spaceIndex === -1;
-  const partial = isFirstToken ? beforeCursor : beforeCursor.slice(spaceIndex + 1);
+  const partial = spaceIndex === -1 ? beforeCursor : beforeCursor.slice(spaceIndex + 1);
+  const prefix = beforeCursor.slice(0, beforeCursor.length - partial.length);
+  const isCommand = prefix.trim() === "" || prefix.trimEnd().endsWith("|");
 
-  if (isFirstToken) {
+  if (isCommand) {
     // Complete command names
     const matches = Object.keys(commands).filter((c) => c.startsWith(partial));
     if (matches.length === 1) {
-      inputEl.value = matches[0] + " " + value.slice(cursorPos);
-      inputEl.selectionStart = inputEl.selectionEnd = matches[0].length + 1;
+      inputEl.value = prefix + matches[0] + " " + value.slice(cursorPos);
+      inputEl.selectionStart = inputEl.selectionEnd = prefix.length + matches[0].length + 1;
     } else if (matches.length > 1) {
       const common = longestCommonPrefix(matches);
       if (common.length > partial.length) {
-        inputEl.value = common + value.slice(cursorPos);
-        inputEl.selectionStart = inputEl.selectionEnd = common.length;
+        inputEl.value = prefix + common + value.slice(cursorPos);
+        inputEl.selectionStart = inputEl.selectionEnd = prefix.length + common.length;
       } else {
         // Show all matches
         print(`\nguest@web:${cwdDisplay()}$ ${value}`);
@@ -317,7 +462,9 @@ function tabComplete() {
   const dirNode = getNode(dirParts);
   if (!dirNode || dirNode.type !== "dir") return;
 
-  const matches = Object.keys(dirNode.children).filter((n) => n.startsWith(namePrefix));
+  const matches = Object.keys(dirNode.children).filter((n) => {
+    return n.startsWith(namePrefix) && (namePrefix.startsWith(".") || !n.startsWith("."));
+  });
   if (matches.length === 0) return;
 
   const buildCompletion = (name) => {
@@ -397,6 +544,7 @@ document.addEventListener("click", (e) => {
   const selection = window.getSelection();
   if (selection && selection.toString().length > 0) return;
   if (e.target.closest("#header")) return;
+  if (program) return;
   inputEl.focus();
 });
 

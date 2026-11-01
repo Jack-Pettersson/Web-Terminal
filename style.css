@@ -132,6 +132,86 @@ html, body {
   font-weight: bold;
 }
 
+#program {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  overflow: hidden;
+  touch-action: none;
+  font-family: "Consolas", monospace;
+  font-size: 15px;
+  color: var(--text);
+  background: var(--bg);
+}
+
+#program canvas {
+  display: block;
+}
+
+#program-exit {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1;
+  font: inherit;
+  color: var(--text);
+  background: var(--header-bg);
+  border: 1px solid var(--header-border);
+  border-radius: 4px;
+  padding: 8px 14px;
+}
+
+.program-screen {
+  font: inherit;
+  line-height: 1.1;
+  height: 100%;
+  padding: 12px;
+  overflow: hidden;
+  white-space: pre-wrap;
+}
+
+.program-screen.sl {
+  position: absolute;
+  top: 30%;
+  height: auto;
+  padding: 0;
+  white-space: pre;
+  color: var(--accent);
+}
+
+.program-screen.snake {
+  width: fit-content;
+  margin: 0 auto;
+  padding-top: 40px;
+  white-space: pre;
+}
+
+.snake-body {
+  color: var(--accent);
+}
+
+.snake-food {
+  color: var(--error);
+}
+
+#program.meltdown {
+  color: var(--error);
+  animation: meltdown-shake 0.25s linear infinite;
+}
+
+@keyframes meltdown-shake {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-4px, 2px); }
+  50% { transform: translate(3px, -3px); }
+  75% { transform: translate(-2px, -2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #program.meltdown {
+    animation: none;
+  }
+}
+
 #input-line {
   display: flex;
   align-items: center;

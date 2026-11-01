@@ -1,5 +1,9 @@
-commands.cat = (args) => {
-  if (!args[0]) return print("cat: missing operand", "error");
+commands.cat = (args, stdin) => {
+  if (!args[0]) {
+    if (stdin) return print(stdin);
+    if (stdin === undefined) print("cat: missing operand", "error");
+    return;
+  }
 
   const parts = resolvePath(args[0]);
   const node = getNode(parts);
