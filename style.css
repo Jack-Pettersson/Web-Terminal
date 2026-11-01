@@ -110,6 +110,28 @@ html, body {
   font-weight: bold;
 }
 
+#output .neofetch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 24px;
+  margin: 4px 0;
+}
+
+#output .neofetch-art {
+  flex: none;
+  white-space: pre;
+  line-height: 1.1;
+}
+
+#output .neofetch-info {
+  flex: 1 1 220px;
+}
+
+#output .neofetch-title {
+  font-weight: bold;
+}
+
 #input-line {
   display: flex;
   align-items: center;
