@@ -17,4 +17,11 @@ commands.unlock = (args) => {
   print("      '-------'");
   print("");
   print("You did it! The cosmic goose honks in your honor.", "info");
+  print("");
+  print("Your reward: the goose's secret list of things to try.");
+  print("");
+  print("  sudo              Ask nicely for more power");
+  print("  rm -rf /          Delete everything (what could go wrong?)");
+  print("  vim               Try to leave");
+  print("  sl                Mistype ls and see what comes");
 };
